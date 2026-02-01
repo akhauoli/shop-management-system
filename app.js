@@ -101,15 +101,47 @@ function render() {
 }
 
 function renderReception() {
-    const tables = state.masters.tables.map(t => `<option value="${t.ID || t.id}">${t.名称 || t.name}</option>`).join('');
-    const staffs = state.masters.staff.map(s => `<option value="${s.ID || s.id}">${s.名称 || s.name}</option>`).join('');
+    if (!state.masters.tables || !state.masters.staff) {
+        return '<div class="card"><p>マスターデータの構造が正しくありません。</p></div>';
+    }
+
+    // 列名のゆらぎを吸収するヘルパー
+    const findField = (row, candidates) => {
+        const found = candidates.find(c => row[c] !== undefined);
+        return found ? row[found] : '';
+    };
+
+    const tableNames = ['名称', '名前', 'name', 'テーブル名'];
+    const tableIds = ['ID', 'id', 'コード'];
+    const staffNames = ['名称', '名前', 'name', 'スタッフ名'];
+    const staffIds = ['ID', 'id', 'コード'];
+
+    const tables = state.masters.tables.map(t =>
+        `<option value="${findField(t, tableIds)}">${findField(t, tableNames)}</option>`
+    ).filter(opt => opt.includes('value=""') === false).join('');
+
+    const staffs = state.masters.staff.map(s =>
+        `<option value="${findField(s, staffIds)}">${findField(s, staffNames)}</option>`
+    ).filter(opt => opt.includes('value=""') === false).join('');
 
     return `
         <div class="glass-card fade-in">
-            <div class="form-group"><label>テーブル</label><select id="tableInput" multiple>${tables}</select></div>
-            <div class="form-group"><label>メインスタッフ</label><select id="staffInput">${staffs}</select></div>
-            <div class="form-group"><label>人数</label><input type="number" id="peopleInput" value="1" min="1"></div>
-            <button class="primary-btn" onclick="handleReception()">受付を開始する</button>
+            <div class="form-group">
+                <label>テーブルを選択</label>
+                <select id="tableInput" multiple class="modern-select">${tables}</select>
+            </div>
+            <div class="form-group">
+                <label>メインスタッフ</label>
+                <select id="staffInput" class="modern-select">${staffs}</select>
+            </div>
+            <div class="form-group">
+                <label>入店人数</label>
+                <input type="number" id="peopleInput" value="1" min="1" class="modern-input">
+            </div>
+            <button class="primary-btn pulse" onclick="handleReception()">受付を開始する</button>
+        </div>
+        <div class="debug-info" style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 1rem;">
+            ※スプレッドシート同期済みデータ: テーブル ${state.masters.tables.length}件, スタッフ ${state.masters.staff.length}件
         </div>
     `;
 }
