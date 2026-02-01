@@ -22,6 +22,7 @@ async function initApp() {
     setupEventListeners();
     await fetchStoreList();
     renderStoreSelector();
+    switchTab('reception'); // 初期タブの表示とデータロードのトリガー
 }
 
 function setupEventListeners() {
