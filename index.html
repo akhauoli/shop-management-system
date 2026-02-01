@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プレミアム店舗管理システム</title>
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body class="dark-theme">
+    <header class="glass-header">
+        <div class="header-content">
+            <h1 class="logo">LUXURY<span>POS</span></h1>
+            <div class="store-selector">
+                <select id="storeSelect">
+                    <option value="">店舗を選択中...</option>
+                </select>
+            </div>
+            <nav class="main-nav">
+                <button class="nav-btn active" data-tab="reception">受付</button>
+                <button class="nav-btn" data-tab="service">接客中</button>
+                <button class="nav-btn" data-tab="checkout">精算</button>
+            </nav>
+        </div>
+    </header>
+
+    <main id="app">
+        <div class="loader-container">
+            <div class="loader"></div>
+            <p>データを同期中...</p>
+        </div>
+    </main>
+
+    <div id="modal-container" class="hidden"></div>
+    <div id="toast-container"></div>
+
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>
