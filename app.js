@@ -1,5 +1,5 @@
 /**
- * LUXURY POS - Main Application Logic
+ * Léâme POS System - Main Application Logic
  */
 
 const CONFIG = {
@@ -15,6 +15,7 @@ let state = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('App initialization started...');
     initApp();
 });
 
@@ -22,7 +23,11 @@ async function initApp() {
     setupEventListeners();
     await fetchStoreList();
     renderStoreSelector();
-    switchTab('reception'); // 初期タブの表示とデータロードのトリガー
+    // 起動時に現在のタブを確認し、データが必要ならロード
+    if (!state.masters) {
+        await loadStoreData();
+    }
+    render();
 }
 
 function setupEventListeners() {
@@ -44,22 +49,21 @@ function setupEventListeners() {
 
 async function fetchStoreList() {
     try {
-        console.log('Fetching stores from:', `${CONFIG.DATA_PATH}stores.json`);
-        const response = await fetch(`${CONFIG.DATA_PATH}stores.json`);
+        const cacheBuster = `?v=${new Date().getTime()}`;
+        const url = `${CONFIG.DATA_PATH}stores.json${cacheBuster}`;
+        console.log('Fetching stores from:', url);
+
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
         state.stores = await response.json();
-        console.log('Stores fetched:', state.stores);
         if (state.stores.length > 0) {
             state.selectedStoreId = state.stores[0].id;
-            await loadStoreData();
         }
     } catch (e) {
         console.error('Failed to fetch stores list:', e);
-        state.stores = [{ id: '1U0BOkVRDLyr27GiHsOgDcl_CmUMMP7JcOoAZXLx3G5Y', name: 'Léâme 本店 (Fallback)' }];
+        state.stores = [{ id: '1U0BOkVRDLyr27GiHsOgDcl_CmUMMP7JcOoAZXLx3G5Y', name: 'Léâme 本店' }];
         state.selectedStoreId = state.stores[0].id;
-        renderStoreSelector();
-        // Fallback時もデータロードを試みる
-        await loadStoreData();
     }
 }
 
@@ -76,22 +80,42 @@ function switchTab(tab) {
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
-    render();
+
+    if (!state.masters) {
+        loadStoreData();
+    } else {
+        render();
+    }
 }
 
 async function loadStoreData() {
     try {
-        console.log('Loading masters from:', `${CONFIG.DATA_PATH}masters.json`);
-        const response = await fetch(`${CONFIG.DATA_PATH}masters.json`);
+        const cacheBuster = `?v=${new Date().getTime()}`;
+        const url = `${CONFIG.DATA_PATH}masters.json${cacheBuster}`;
+        console.log('Loading masters from:', url);
+
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
         state.masters = await response.json();
         console.log('Léâme Masters Loaded:', state.masters);
         render();
     } catch (e) {
         console.error('Failed to load master data:', e);
-        // コンソールに詳細を出力してユーザーが見れるようにする
         const app = document.getElementById('app');
-        if (app) app.innerHTML = `<div class="card"><p style="color:red;">データの読み込みに失敗しました。GitHub Actionsの完了をお待ちください。</p><p style="font-size:0.8rem;">Error: ${e.message}</p></div>`;
+        if (app) {
+            app.innerHTML = `
+                <div class="glass-card error-card fade-in">
+                    <h3>マスターデータを読み込めませんでした</h3>
+                    <p>この画面が続く場合は、リロードをお試しください。</p>
+                    <button class="primary-btn" onclick="location.reload()">再読み込み</button>
+                    <div style="font-size:0.7rem; color:var(--text-dim); margin-top:20px;">
+                        Path: ${CONFIG.DATA_PATH}masters.json<br>
+                        Error: ${e.message}
+                    </div>
+                </div>
+            `;
+        }
     }
 }
 
@@ -117,26 +141,16 @@ function render() {
 }
 
 function renderReception() {
-    if (!state.masters || !state.masters.tables || !state.masters.staff) {
-        return '<div class="card"><p>マスターデータを読み込み中...</p></div>';
+    if (!state.masters || !state.masters.staff || !state.masters.tables) {
+        return '<div class="card"><p>データが空です。スプレッドシートの有効フラグをご確認ください。</p></div>';
     }
 
-    const findField = (row, candidates) => {
-        const found = candidates.find(c => row[c] !== undefined);
-        return found ? row[found] : '';
-    };
-
-    const tableNames = ['名称', '名前', 'name', 'テーブル名'];
-    const tableIds = ['ID', 'id', 'コード'];
-    const staffNames = ['名称', '名前', 'name', 'スタッフ名'];
-    const staffIds = ['ID', 'id', 'コード'];
-
     const tables = state.masters.tables.map(t =>
-        `<option value="${findField(t, tableIds)}">${findField(t, tableNames)}</option>`
+        `<option value="${t.id}">${t.name}</option>`
     ).join('');
 
     const staffs = state.masters.staff.map(s =>
-        `<option value="${findField(s, staffIds)}">${findField(s, staffNames)}</option>`
+        `<option value="${s.id}">${s.name}</option>`
     ).join('');
 
     return `
@@ -174,16 +188,11 @@ async function handleReception() {
     const REPO_OWNER = 'akhauoli';
     const REPO_NAME = 'shop-management-system';
 
-    // セキュリティ上の理由から、トークンはソースコードに含めず、初回実行時または必要時にユーザーに入力させます。
     let githubToken = localStorage.getItem('POS_GH_TOKEN');
     if (!githubToken) {
-        githubToken = prompt('GitHub Personal Access Token (PAT) を入力してください。このトークンはブラウザのローカルストレージにのみ保存されます。');
-        if (githubToken) {
-            localStorage.setItem('POS_GH_TOKEN', githubToken);
-        } else {
-            alert('トークンが入力されなかったため、送信を中止しました。');
-            return;
-        }
+        githubToken = prompt('GitHub PAT を入力してください');
+        if (githubToken) localStorage.setItem('POS_GH_TOKEN', githubToken);
+        else return;
     }
 
     const payload = {
@@ -195,7 +204,7 @@ async function handleReception() {
         main_cast_name: document.getElementById('staffInput').options[document.getElementById('staffInput').selectedIndex].text,
         sub_cast_ids: Array.from(document.getElementById('subStaffInput').selectedOptions).map(o => o.value),
         sub_cast_names: Array.from(document.getElementById('subStaffInput').selectedOptions).map(o => o.text).join(','),
-        base_fee: 3000 // デフォルト値。必要に応じて設定から取得。
+        base_fee: 3000
     };
 
     if (!payload.table_ids.length || !payload.main_cast_id) {
@@ -223,18 +232,14 @@ async function handleReception() {
         });
 
         if (response.ok) {
-            alert('送信成功！GitHub Actions が書き込みを開始しました。反映まで数十秒お待ちください。');
+            alert('送信成功！反映まで数十秒お待ちください。');
             location.reload();
         } else {
             const err = await response.json();
-            if (response.status === 401) {
-                localStorage.removeItem('POS_GH_TOKEN');
-                throw new Error('トークンが無効です。再読み込みして正しいトークンを入力してください。');
-            }
+            if (response.status === 401) localStorage.removeItem('POS_GH_TOKEN');
             throw new Error(err.message || 'API送信失敗');
         }
     } catch (e) {
-        console.error('Dispatch Error:', e);
         alert('エラーが発生しました: ' + e.message);
     }
 }
