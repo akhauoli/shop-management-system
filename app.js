@@ -48,11 +48,11 @@ function setupEventListeners() {
 async function fetchStoreList() {
     try {
         const cacheBuster = `?v=${new Date().getTime()}`;
-        const url = `${CONFIG.DATA_PATH}stores.json${cacheBuster}`;
+        const url = `./data/stores.json${cacheBuster}`;
         console.log('Fetching stores from:', url);
 
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
         state.stores = await response.json();
         if (state.stores.length > 0) {
@@ -60,6 +60,8 @@ async function fetchStoreList() {
         }
     } catch (e) {
         console.error('Failed to fetch stores list:', e);
+        showError('店舗リストの読み込みに失敗しました', e.message, './data/stores.json');
+        // フォールバック設定
         state.stores = [{ id: '1U0BOkVRDLyr27GiHsOgDcl_CmUMMP7JcOoAZXLx3G5Y', name: 'Léâme 本店' }];
         state.selectedStoreId = state.stores[0].id;
     }
@@ -89,31 +91,35 @@ function switchTab(tab) {
 async function loadStoreData() {
     try {
         const cacheBuster = `?v=${new Date().getTime()}`;
-        const url = `${CONFIG.DATA_PATH}masters.json${cacheBuster}`;
+        const url = `./data/masters.json${cacheBuster}`;
         console.log('Loading masters from:', url);
 
         const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 
         state.masters = await response.json();
         console.log('Léâme Masters Loaded:', state.masters);
         render();
     } catch (e) {
         console.error('Failed to load master data:', e);
-        const app = document.getElementById('app');
-        if (app) {
-            app.innerHTML = `
-                <div class="glass-card error-card fade-in">
-                    <h3>マスターデータを読み込めませんでした</h3>
-                    <p>この画面が続く場合は、リロードをお試しください。</p>
-                    <button class="primary-btn" onclick="location.reload()">再読み込み</button>
-                    <div style="font-size:0.7rem; color:var(--text-dim); margin-top:20px;">
-                        Path: ${CONFIG.DATA_PATH}masters.json<br>
-                        Error: ${e.message}
-                    </div>
+        showError('マスターデータの読み込みに失敗しました', e.message, './data/masters.json');
+    }
+}
+
+function showError(title, message, path) {
+    const app = document.getElementById('app');
+    if (app) {
+        app.innerHTML = `
+            <div class="glass-card error-card fade-in">
+                <h3>データ読み込みエラー</h3>
+                <p><strong>${title}</strong></p>
+                <div style="background: rgba(255,0,0,0.1); padding: 10px; border-radius: 8px; margin: 10px 0; text-align: left; font-family: monospace; font-size: 0.8rem;">
+                    Error: ${message}<br>
+                    Path: ${path}
                 </div>
-            `;
-        }
+                <button class="primary-btn" onclick="location.reload()">再読み込みを試す</button>
+            </div>
+        `;
     }
 }
 
