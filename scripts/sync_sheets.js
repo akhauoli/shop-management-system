@@ -50,9 +50,10 @@ async function syncSheets() {
         fs.writeFileSync(path.join(dataDir, 'masters.json'), JSON.stringify(data.masters, null, 2));
         fs.writeFileSync(path.join(dataDir, 'stores.json'), JSON.stringify(data.stores, null, 2));
 
-        console.log('Successfully synced all Léâme management data to ./data/');
+        console.log(`Successfully synced all Léâme management data to ./data/ using spreadsheet: ${spreadsheetId}`);
     } catch (err) {
-        console.error('The API returned an error: ' + err);
+        console.error('CRITICAL ERROR during sync: ' + err);
+        process.exit(1); // Actions を確実に失敗させる
     }
 }
 
