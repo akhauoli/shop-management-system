@@ -24,9 +24,7 @@ async function initApp() {
     await fetchStoreList();
     renderStoreSelector();
     // 起動時に現在のタブを確認し、データが必要ならロード
-    if (!state.masters) {
-        await loadStoreData();
-    }
+    await loadStoreData();
     render();
 }
 
@@ -145,13 +143,15 @@ function renderReception() {
         return '<div class="card"><p>データが空です。スプレッドシートの有効フラグをご確認ください。</p></div>';
     }
 
+    // 日本語キー（GAS抽出結果）に対応
     const tables = state.masters.tables.map(t =>
-        `<option value="${t.id}">${t.name}</option>`
+        `<option value="${t['テーブルID'] || t.id}">${t['テーブル名'] || t.name}</option>`
     ).join('');
 
     const staffs = state.masters.staff.map(s =>
-        `<option value="${s.id}">${s.name}</option>`
+        `<option value="${s['キャストID'] || s.id}">${s['キャスト名'] || s.name}</option>`
     ).join('');
+
 
     return `
         <div class="glass-card fade-in">
