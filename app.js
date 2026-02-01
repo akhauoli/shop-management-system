@@ -155,6 +155,21 @@ function renderReception() {
 }
 
 async function handleReception() {
+    const REPO_OWNER = 'akhauoli';
+    const REPO_NAME = 'shop-management-system';
+
+    // セキュリティ上の理由から、トークンはソースコードに含めず、初回実行時または必要時にユーザーに入力させます。
+    let githubToken = localStorage.getItem('POS_GH_TOKEN');
+    if (!githubToken) {
+        githubToken = prompt('GitHub Personal Access Token (PAT) を入力してください。このトークンはブラウザのローカルストレージにのみ保存されます。');
+        if (githubToken) {
+            localStorage.setItem('POS_GH_TOKEN', githubToken);
+        } else {
+            alert('トークンが入力されなかったため、送信を中止しました。');
+            return;
+        }
+    }
+
     const payload = {
         customer_type: document.getElementById('customerType').value,
         people_count: parseInt(document.getElementById('peopleInput').value),
@@ -164,7 +179,7 @@ async function handleReception() {
         main_cast_name: document.getElementById('staffInput').options[document.getElementById('staffInput').selectedIndex].text,
         sub_cast_ids: Array.from(document.getElementById('subStaffInput').selectedOptions).map(o => o.value),
         sub_cast_names: Array.from(document.getElementById('subStaffInput').selectedOptions).map(o => o.text).join(','),
-        base_fee: 0 // 設定シートから取得するロジックを後で追加
+        base_fee: 3000 // デフォルト値。必要に応じて設定から取得。
     };
 
     if (!payload.table_ids.length || !payload.main_cast_id) {
@@ -172,9 +187,38 @@ async function handleReception() {
         return;
     }
 
-    if (confirm('スプレッドシートへの直接書き込みを実行します。よろしいですか？')) {
-        // GitHub Repository Dispatch API を叩く (実際にはトークンが必要なため、手順を別途案内)
-        console.log('Dispatching POS Action:', payload);
-        alert('送信準備完了（この後のAPI連携手順をエージェントに確認してください）');
+    if (!confirm('スプレッドシートへ送信します。よろしいですか？')) return;
+
+    try {
+        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/dispatches`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `token ${githubToken}`,
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                event_type: 'pos_action',
+                client_payload: {
+                    action: 'CREATE_TICKET',
+                    payload: payload
+                }
+            })
+        });
+
+        if (response.ok) {
+            alert('送信成功！GitHub Actions が書き込みを開始しました。反映まで数十秒お待ちください。');
+            location.reload();
+        } else {
+            const err = await response.json();
+            if (response.status === 401) {
+                localStorage.removeItem('POS_GH_TOKEN');
+                throw new Error('トークンが無効です。再読み込みして正しいトークンを入力してください。');
+            }
+            throw new Error(err.message || 'API送信失敗');
+        }
+    } catch (e) {
+        console.error('Dispatch Error:', e);
+        alert('エラーが発生しました: ' + e.message);
     }
 }
