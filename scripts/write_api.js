@@ -3,7 +3,12 @@ const crypto = require('crypto');
 
 async function writeToSheet() {
     const action = process.env.ACTION;
-    const payload = JSON.parse(process.env.PAYLOAD);
+    const payloadBuffer = process.env.PAYLOAD;
+    if (!payloadBuffer) {
+        console.error('No PAYLOAD provided');
+        process.exit(1);
+    }
+    const payload = JSON.parse(payloadBuffer);
     const credentials = JSON.parse(process.env.GOOGLE_SHEETS_CREDENTIALS);
     const spreadsheetId = '1U0BOkVRDLyr27GiHsOgDcl_CmUMMP7JcOoAZXLx3G5Y';
 
@@ -16,13 +21,13 @@ async function writeToSheet() {
     if (action === 'CREATE_TICKET') {
         const ticketId = crypto.randomUUID();
         const now = new Date();
-        const timezoneOffset = 9 * 60; // JST
-        const jstDate = new Date(now.getTime() + timezoneOffset * 60000);
+        const jstDate = new Date(now.getTime() + 9 * 60 * 60000);
+        const timestamp = jstDate.toISOString().replace('T', ' ').substring(0, 19);
 
-        // 1. 伝票シートへのAppend ([ID, 区分, 人数, TableIDs, TableNames, MainID, MainName, SubIDs, SubNames, Checkin, Total, Back, Discount, Status, Elapsed, Running, LastStart])
+        // 1. 伝票シートへの追加
         await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: '伝票!A:Q',
+            range: '伝票!A:N',
             valueInputOption: 'USER_ENTERED',
             requestBody: {
                 values: [[
@@ -35,45 +40,81 @@ async function writeToSheet() {
                     payload.main_cast_name,
                     payload.sub_cast_ids.join(','),
                     payload.sub_cast_names,
-                    jstDate.toLocaleString('ja-JP'),
-                    0, 0, 0, 'ACTIVE', 0, false, 0
+                    timestamp,
+                    0, 0, 0, 'OPEN'
                 ]]
             }
         });
 
-        // 2. 明細シートへの初期「基本料金」追加 ([TicketID, LineID, ProdID, ProdName, Qty, Price, ProvidedBy, KeepName, TS])
+        // 2. 明細シートへ basic を人数分追加
         await sheets.spreadsheets.values.append({
             spreadsheetId,
-            range: '明細!A:I',
+            range: '明細!A:G',
             valueInputOption: 'USER_ENTERED',
             requestBody: {
                 values: [[
                     ticketId,
-                    crypto.randomUUID(),
                     'basic',
-                    '基本料金',
+                    '基本セット',
                     payload.people_count,
-                    payload.base_fee,
-                    '',
-                    '',
-                    jstDate.toLocaleString('ja-JP')
+                    payload.base_fee || 3000,
+                    (payload.base_fee || 3000) * payload.people_count,
+                    timestamp
                 ]]
             }
         });
 
-        process.stdout.write(JSON.stringify({ success: true, ticket_id: ticketId }));
-    }
-
-    if (action === 'ADD_LINE') {
-        // ... 商品追加ロジックの移植
+        console.log(`Ticket Created: ${ticketId} with auto basic lines.`);
     }
 
     if (action === 'CHECKOUT') {
-        // ... 精算ロジック、売上サマリへの書き込み、ステータス更新の移植
+        const ticketId = payload.ticket_id;
+
+        // 設定取得
+        const settingsRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: '設定!A1:B20' });
+        const settings = {};
+        (settingsRes.data.values || []).forEach(r => settings[r[0]] = r[1]);
+
+        const svRate = parseFloat(settings['サービス料率']) || 0.1;
+        const taxRate = parseFloat(settings['消費税率']) || 0.1;
+
+        // 明細取得
+        const detailRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: '明細!A:G' });
+        const ticketLines = (detailRes.data.values || []).filter(r => r[0] === ticketId);
+
+        let subtotal = ticketLines.reduce((sum, r) => sum + (parseInt(r[5]) || 0), 0);
+        subtotal += (parseInt(payload.discount) || 0);
+
+        // 厳密計算 (Math.floor)
+        const serviceFee = Math.floor(subtotal * svRate);
+        const tax = Math.floor(subtotal * taxRate);
+        const total = subtotal + serviceFee + tax;
+
+        // 売上サマリ記録
+        await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range: '売上サマリ!A:I',
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values: [[
+                    new Date().toISOString(),
+                    ticketId,
+                    subtotal,
+                    serviceFee,
+                    tax,
+                    total,
+                    payload.payment_method || '現金',
+                    payload.main_cast_name,
+                    'DONE'
+                ]]
+            }
+        });
+
+        console.log(`Checkout for ${ticketId} complete. Total: ${total}`);
     }
 }
 
 writeToSheet().catch(e => {
-    process.stderr.write(JSON.stringify({ success: false, error: e.message }));
+    console.error(e);
     process.exit(1);
 });
