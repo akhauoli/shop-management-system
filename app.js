@@ -69,12 +69,47 @@ function switchTab(tab) {
 }
 
 async function loadStoreData() {
-    // データ読み込みロジック
-    render();
+    try {
+        const response = await fetch(`${CONFIG.DATA_PATH}masters.json`);
+        state.masters = await response.json();
+        console.log('Léâme Masters Loaded:', state.masters);
+        render();
+    } catch (e) {
+        console.error('Failed to load master data', e);
+    }
 }
 
 function render() {
     const app = document.getElementById('app');
     if (!app) return;
-    app.innerHTML = `<h2>${state.currentTab.toUpperCase()}</h2><p>店舗ID: ${state.selectedStoreId} のデータを表示中...</p>`;
+
+    if (!state.masters) {
+        app.innerHTML = '<div class="loader-container"><div class="loader"></div><p>マスターデータを準備中...</p></div>';
+        return;
+    }
+
+    const { currentTab } = state;
+    let html = `<div class="content-header"><h2>${currentTab === 'reception' ? '受付' : currentTab === 'service' ? '接客中' : '精算'}</h2></div>`;
+
+    if (currentTab === 'reception') {
+        html += renderReception();
+    } else {
+        html += `<div class="card"><p>${currentTab.toUpperCase()} モジュール準備中...</p></div>`;
+    }
+
+    app.innerHTML = html;
+}
+
+function renderReception() {
+    const tables = state.masters.tables.map(t => `<option value="${t.ID || t.id}">${t.名称 || t.name}</option>`).join('');
+    const staffs = state.masters.staff.map(s => `<option value="${s.ID || s.id}">${s.名称 || s.name}</option>`).join('');
+
+    return `
+        <div class="glass-card fade-in">
+            <div class="form-group"><label>テーブル</label><select id="tableInput" multiple>${tables}</select></div>
+            <div class="form-group"><label>メインスタッフ</label><select id="staffInput">${staffs}</select></div>
+            <div class="form-group"><label>人数</label><input type="number" id="peopleInput" value="1" min="1"></div>
+            <button class="primary-btn" onclick="handleReception()">受付を開始する</button>
+        </div>
+    `;
 }
