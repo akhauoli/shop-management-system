@@ -101,11 +101,10 @@ function render() {
 }
 
 function renderReception() {
-    if (!state.masters.tables || !state.masters.staff) {
-        return '<div class="card"><p>マスターデータの構造が正しくありません。</p></div>';
+    if (!state.masters || !state.masters.tables || !state.masters.staff) {
+        return '<div class="card"><p>マスターデータを読み込み中...</p></div>';
     }
 
-    // 列名のゆらぎを吸収するヘルパー
     const findField = (row, candidates) => {
         const found = candidates.find(c => row[c] !== undefined);
         return found ? row[found] : '';
@@ -118,30 +117,64 @@ function renderReception() {
 
     const tables = state.masters.tables.map(t =>
         `<option value="${findField(t, tableIds)}">${findField(t, tableNames)}</option>`
-    ).filter(opt => opt.includes('value=""') === false).join('');
+    ).join('');
 
     const staffs = state.masters.staff.map(s =>
         `<option value="${findField(s, staffIds)}">${findField(s, staffNames)}</option>`
-    ).filter(opt => opt.includes('value=""') === false).join('');
+    ).join('');
 
     return `
         <div class="glass-card fade-in">
             <div class="form-group">
-                <label>テーブルを選択</label>
-                <select id="tableInput" multiple class="modern-select">${tables}</select>
+                <label>顧客区分</label>
+                <select id="customerType" class="modern-select">
+                    <option value="通常">通常</option>
+                    <option value="新規">新規</option>
+                    <option value="指名">指名</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>テーブル選択 (複数可)</label>
+                <select id="tableInput" multiple class="modern-select" style="height: 120px;">${tables}</select>
             </div>
             <div class="form-group">
                 <label>メインスタッフ</label>
                 <select id="staffInput" class="modern-select">${staffs}</select>
             </div>
             <div class="form-group">
+                <label>サブスタッフ (複数選択)</label>
+                <select id="subStaffInput" multiple class="modern-select" style="height: 100px;">${staffs}</select>
+            </div>
+            <div class="form-group">
                 <label>入店人数</label>
                 <input type="number" id="peopleInput" value="1" min="1" class="modern-input">
             </div>
-            <button class="primary-btn pulse" onclick="handleReception()">受付を開始する</button>
-        </div>
-        <div class="debug-info" style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 1rem;">
-            ※スプレッドシート同期済みデータ: テーブル ${state.masters.tables.length}件, スタッフ ${state.masters.staff.length}件
+            <button class="primary-btn pulse" onclick="handleReception()">受付を確定・送信</button>
         </div>
     `;
+}
+
+async function handleReception() {
+    const payload = {
+        customer_type: document.getElementById('customerType').value,
+        people_count: parseInt(document.getElementById('peopleInput').value),
+        table_ids: Array.from(document.getElementById('tableInput').selectedOptions).map(o => o.value),
+        table_names: Array.from(document.getElementById('tableInput').selectedOptions).map(o => o.text).join(','),
+        main_cast_id: document.getElementById('staffInput').value,
+        main_cast_name: document.getElementById('staffInput').options[document.getElementById('staffInput').selectedIndex].text,
+        sub_cast_ids: Array.from(document.getElementById('subStaffInput').selectedOptions).map(o => o.value),
+        sub_cast_names: Array.from(document.getElementById('subStaffInput').selectedOptions).map(o => o.text).join(','),
+        base_fee: 0 // 設定シートから取得するロジックを後で追加
+    };
+
+    if (!payload.table_ids.length || !payload.main_cast_id) {
+        alert('テーブルとメインスタッフを選択してください');
+        return;
+    }
+
+    if (confirm('スプレッドシートへの直接書き込みを実行します。よろしいですか？')) {
+        // GitHub Repository Dispatch API を叩く (実際にはトークンが必要なため、手順を別途案内)
+        console.log('Dispatching POS Action:', payload);
+        alert('送信準備完了（この後のAPI連携手順をエージェントに確認してください）');
+    }
 }
