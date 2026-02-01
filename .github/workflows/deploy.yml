@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,12 +34,12 @@ jobs:
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
 
-      - name: Commit Updated Data
+      - name: Force Commit Updated Data
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add data/*.json
-          git diff-index --quiet HEAD || git commit -m "Update master data from Google Sheets"
+          git add data/
+          git commit -m "Auto-update: Genuine POS master data via GAS logic" || echo "No changes to commit"
           git push origin main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
