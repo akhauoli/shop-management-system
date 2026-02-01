@@ -42,7 +42,7 @@ async function syncSheets() {
             }
         };
 
-        const dataDir = path.join(__dirname, '../public/data');
+        const dataDir = path.join(__dirname, '../data');
         if (!fs.existsSync(dataDir)) {
             fs.mkdirSync(dataDir, { recursive: true });
         }
@@ -50,7 +50,7 @@ async function syncSheets() {
         fs.writeFileSync(path.join(dataDir, 'masters.json'), JSON.stringify(data.masters, null, 2));
         fs.writeFileSync(path.join(dataDir, 'stores.json'), JSON.stringify(data.stores, null, 2));
 
-        console.log('Successfully synced all Léâme management data!');
+        console.log('Successfully synced all Léâme management data to ./data/');
     } catch (err) {
         console.error('The API returned an error: ' + err);
     }

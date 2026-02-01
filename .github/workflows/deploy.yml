@@ -1,10 +1,11 @@
-name: Deploy to GitHub Pages
+name: Deploy POS System
 
 on:
   push:
     branches: [ main ]
   schedule:
-    - cron: '0 * * * *' # 1時間に1回データを同期
+    - cron: '0 * * * *' # 1時間に1回自動更新
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -19,21 +20,21 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: |
-          if [ -f package.json ]; then
-            npm install
-          else
-            npm init -y
-            npm install googleapis
-          fi
+        run: npm install googleapis
 
-      - name: Sync Google Sheets Data
+      - name: Sync Data from Google Sheets
         run: node scripts/sync_sheets.js
         env:
           GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
 
-      - name: Build and Deploy
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: . # プロジェクトルートをデプロイ
-          branch: gh-pages
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

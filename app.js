@@ -3,7 +3,7 @@
  */
 
 const CONFIG = {
-    DATA_PATH: './public/data/'
+    DATA_PATH: './data/'
 };
 
 let state = {
@@ -22,7 +22,6 @@ async function initApp() {
     setupEventListeners();
     await fetchStoreList();
     renderStoreSelector();
-    switchTab('reception');
 }
 
 function setupEventListeners() {
@@ -44,10 +43,22 @@ function setupEventListeners() {
 
 async function fetchStoreList() {
     try {
+        console.log('Fetching stores from:', `${CONFIG.DATA_PATH}stores.json`);
         const response = await fetch(`${CONFIG.DATA_PATH}stores.json`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         state.stores = await response.json();
+        console.log('Stores fetched:', state.stores);
+        if (state.stores.length > 0) {
+            state.selectedStoreId = state.stores[0].id;
+            await loadStoreData();
+        }
     } catch (e) {
-        state.stores = [{ id: '1U0BOkVRDLyr27GiHsOgDcl_CmUMMP7JcOoAZXLx3G5Y', name: 'マスター店舗' }];
+        console.error('Failed to fetch stores list:', e);
+        state.stores = [{ id: '1U0BOkVRDLyr27GiHsOgDcl_CmUMMP7JcOoAZXLx3G5Y', name: 'Léâme 本店 (Fallback)' }];
+        state.selectedStoreId = state.stores[0].id;
+        renderStoreSelector();
+        // Fallback時もデータロードを試みる
+        await loadStoreData();
     }
 }
 
@@ -57,7 +68,6 @@ function renderStoreSelector() {
     selector.innerHTML = state.stores.map(s =>
         `<option value="${s.id}">${s.name}</option>`
     ).join('');
-    state.selectedStoreId = state.stores[0].id;
 }
 
 function switchTab(tab) {
@@ -70,12 +80,17 @@ function switchTab(tab) {
 
 async function loadStoreData() {
     try {
+        console.log('Loading masters from:', `${CONFIG.DATA_PATH}masters.json`);
         const response = await fetch(`${CONFIG.DATA_PATH}masters.json`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         state.masters = await response.json();
         console.log('Léâme Masters Loaded:', state.masters);
         render();
     } catch (e) {
-        console.error('Failed to load master data', e);
+        console.error('Failed to load master data:', e);
+        // コンソールに詳細を出力してユーザーが見れるようにする
+        const app = document.getElementById('app');
+        if (app) app.innerHTML = `<div class="card"><p style="color:red;">データの読み込みに失敗しました。GitHub Actionsの完了をお待ちください。</p><p style="font-size:0.8rem;">Error: ${e.message}</p></div>`;
     }
 }
 
